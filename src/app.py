@@ -45,59 +45,202 @@ class ReplyRequest(BaseModel):
     post_id: str = Field(..., description="朋友圈帖子唯一标识")
     previous_replies: Optional[List[str]] = Field(default=[], description="之前的回复内容列表")
 
+class EmotionAnalysisResult(BaseModel):
+    emotion_type: str = Field(..., description="情绪类型")
+    negative_score: int = Field(..., ge=1, le=10, description="负面程度评分，1-10分")
+    emotion_description: str = Field(..., description="情绪描述")
+
 class ReplyResponse(BaseModel):
     reply_content: str = Field(..., description="生成的回复内容")
     is_first_reply: bool = Field(..., description="是否是第一次回复")
     timestamp: datetime = Field(..., description="生成时间戳")
+    emotion_analysis: EmotionAnalysisResult = Field(..., description="情感分析结果")
 
 # 验证回复风格
 valid_styles = ["幽默", "严肃", "暧昧", "温馨", "批评"]
 
+# 情感分析函数
+def analyze_emotion(text: str):
+    """
+    分析文本的情感状态，返回情绪类型和负面程度评分
+    
+    评分规则：
+    - 分数范围为1-10
+    - 分数越高表示情绪越负面
+    - 1-3分：积极正面的情绪
+    - 4-5分：中性或轻微情绪波动
+    - 6-8分：明显的负面情绪
+    - 9-10分：强烈的负面情绪
+    """
+    try:
+        # 构建情感分析提示词
+        prompt = f"""请分析以下文本的情感状态：
+{text}
+
+请按照以下格式返回分析结果：
+1. 情绪类型：[积极/中性/消极/其他具体情绪类型]
+2. 负面程度评分：[1-10的数字，1表示最积极，10表示最负面]
+3. 情绪描述：[对情绪的简要描述]
+
+评分规则：
+- 分数范围为1-10
+- 分数越高表示情绪越负面
+- 1-3分：积极正面的情绪
+- 4-5分：中性或轻微情绪波动
+- 6-8分：明显的负面情绪
+- 9-10分：强烈的负面情绪"""
+        
+        # 模拟情感分析结果（实际使用时应替换为真实API调用）
+        # 这里根据文本长度和内容特征生成模拟结果
+        
+        # 简单的模拟逻辑
+        if "难过" in text or "伤心" in text or "不开心" in text:
+            emotion_type = "消极"
+            negative_score = 7
+            emotion_description = "表达了悲伤或不开心的情绪"
+        elif "开心" in text or "高兴" in text or "快乐" in text:
+            emotion_type = "积极"
+            negative_score = 2
+            emotion_description = "表达了愉悦或开心的情绪"
+        elif "生气" in text or "愤怒" in text or "烦" in text:
+            emotion_type = "消极"
+            negative_score = 8
+            emotion_description = "表达了愤怒或烦躁的情绪"
+        elif "谢谢" in text or "感谢" in text:
+            emotion_type = "积极"
+            negative_score = 1
+            emotion_description = "表达了感激的情绪"
+        elif "压力" in text or "累" in text or "疲惫" in text:
+            emotion_type = "消极"
+            negative_score = 6
+            emotion_description = "表达了压力或疲惫的情绪"
+        else:
+            # 默认中性
+            emotion_type = "中性"
+            negative_score = 4
+            emotion_description = "情绪较为平静，没有明显的积极或消极倾向"
+        
+        # 实际调用示例：
+        # response = openai.chat.completions.create(
+        #     model="gpt-3.5-turbo",
+        #     messages=[{"role": "user", "content": prompt}],
+        #     max_tokens=150,
+        #     temperature=0.3
+        # )
+        # response_text = response.choices[0].message.content.strip()
+        # 
+        # # 解析结果（这里需要根据实际返回格式进行调整）
+        # # 示例解析逻辑
+        # emotion_type = ""
+        # negative_score = 5
+        # emotion_description = ""
+        # 
+        # for line in response_text.split('\n'):
+        #     if line.startswith("1. 情绪类型："):
+        #         emotion_type = line.replace("1. 情绪类型：", "").strip()
+        #     elif line.startswith("2. 负面程度评分："):
+        #         try:
+        #             negative_score = int(line.replace("2. 负面程度评分：", "").strip())
+        #         except:
+        #             negative_score = 5
+        #     elif line.startswith("3. 情绪描述："):
+        #         emotion_description = line.replace("3. 情绪描述：", "").strip()
+        
+        return EmotionAnalysisResult(
+            emotion_type=emotion_type,
+            negative_score=negative_score,
+            emotion_description=emotion_description
+        )
+    except Exception as e:
+        # 出错时返回默认中性结果
+        return EmotionAnalysisResult(
+            emotion_type="中性",
+            negative_score=4,
+            emotion_description=f"情感分析出错: {str(e)}"
+        )
+
 # 生成回复内容的核心函数
 def generate_reply(circle_content: str, reply_style: str, 
-                  is_first_reply: bool, previous_replies: List[str] = None):
+                  is_first_reply: bool, previous_replies: List[str] = None,
+                  emotion_analysis: EmotionAnalysisResult = None):
     """
     调用大模型生成回复内容
     """
     try:
-        # 构建提示词
+        # 构建提示词，加入情感分析信息
+        emotion_info = ""
+        if emotion_analysis:
+            emotion_info = "\n朋友圈情感分析结果:\n- 情绪类型: " + emotion_analysis.emotion_type + "\n- 负面程度评分: " + str(emotion_analysis.negative_score) + "\n- 情绪描述: " + emotion_analysis.emotion_description + "\n"
+            
         if is_first_reply:
-            prompt = f"""请生成一个{reply_style}风格的朋友圈回复。
-朋友圈内容: {circle_content}
-回复要求:
-1. 回复风格必须是{reply_style}
-2. 内容限定50字以内
-3. 可以包含文字和微信表情包
-4. 内容必须符合中国法律法规
-5. 直接输出回复内容，不要添加其他解释"""
+            prompt = "请生成一个" + reply_style + "风格的朋友圈回复。\n"
+            prompt += "朋友圈内容: " + circle_content + "\n"
+            prompt += emotion_info + "\n"
+            prompt += "回复要求:\n"
+            prompt += "1. 回复风格必须是" + reply_style + "\n"
+            prompt += "2. 回复应考虑朋友圈内容的情感状态，对于负面情绪应给予适当安慰或支持\n"
+            prompt += "3. 内容限定50字以内\n"
+            prompt += "4. 可以包含文字和微信表情包\n"
+            prompt += "5. 内容必须符合中国法律法规\n"
+            prompt += "6. 直接输出回复内容，不要添加其他解释"
         else:
             # 构建包含历史回复的提示词
             history_text = "\n之前的回复:\n"
             for i, reply in enumerate(previous_replies[-10:], 1):  # 只保留最近10条
-                history_text += f"{i}. {reply}\n"
+                history_text += "%d. %s\n" % (i, reply)
             
-            prompt = f"""请生成一个{reply_style}风格的朋友圈回复。
-朋友圈内容: {circle_content}
-{history_text}
-回复要求:
-1. 回复风格必须是{reply_style}
-2. 内容限定50字以内
-3. 可以包含文字和微信表情包
-4. 内容必须符合中国法律法规
-5. 直接输出回复内容，不要添加其他解释"""
+            prompt = "请生成一个" + reply_style + "风格的朋友圈回复。\n"
+            prompt += "朋友圈内容: " + circle_content + "\n"
+            prompt += emotion_info + "\n"
+            prompt += history_text + "\n"
+            prompt += "回复要求:\n"
+            prompt += "1. 回复风格必须是" + reply_style + "\n"
+            prompt += "2. 回复应考虑朋友圈内容的情感状态，对于负面情绪应给予适当安慰或支持\n"
+            prompt += "3. 内容限定50字以内\n"
+            prompt += "4. 可以包含文字和微信表情包\n"
+            prompt += "5. 内容必须符合中国法律法规\n"
+            prompt += "6. 直接输出回复内容，不要添加其他解释"
         
         # 调用OpenAI API (模拟实现，实际使用时需要根据具体API调整)
         # 这里为了演示，返回模拟内容
         # 实际项目中替换为真实的API调用
         
-        # 模拟回复生成
-        mock_replies = {
-            "幽默": "哈哈，说得太对了！😂",
-            "严肃": "你说得很有道理，值得深思。",
-            "暧昧": "这个分享很特别呢~ 😊",
-            "温馨": "看完很温暖，谢谢分享~ 🌟",
-            "批评": "我认为这个观点还有待商榷。"
-        }
+        # 模拟回复生成，根据情感分析结果调整回复内容
+        if emotion_analysis:
+            # 根据情感状态生成不同的模拟回复
+            if emotion_analysis.negative_score >= 6:  # 负面情绪
+                mock_replies = {
+                    "幽默": "希望我的回复能让你心情好一点~ 😉",
+                    "严肃": "理解你的感受，一切都会好起来的。",
+                    "暧昧": "很心疼你的状态，需要一个拥抱吗？ 🫂",
+                    "温馨": "别难过，我在这里陪伴你~ 🌟",
+                    "批评": "虽然情绪不好，但我们可以一起分析问题。"
+                }
+            elif emotion_analysis.negative_score <= 3:  # 积极情绪
+                mock_replies = {
+                    "幽默": "看到你开心我也很开心！😂",
+                    "严肃": "你的积极态度很值得赞赏。",
+                    "暧昧": "你的快乐感染了我~ 😊",
+                    "温馨": "真好，能分享你的快乐~ 🌟",
+                    "批评": "虽然整体积极，但还有些小建议想和你探讨。"
+                }
+            else:  # 中性情绪
+                mock_replies = {
+                    "幽默": "哈哈，说得太对了！😂",
+                    "严肃": "你说得很有道理，值得深思。",
+                    "暧昧": "这个分享很特别呢~ 😊",
+                    "温馨": "看完很温暖，谢谢分享~ 🌟",
+                    "批评": "我认为这个观点还有待商榷。"
+                }
+        else:
+            # 默认回复
+            mock_replies = {
+                "幽默": "哈哈，说得太对了！😂",
+                "严肃": "你说得很有道理，值得深思。",
+                "暧昧": "这个分享很特别呢~ 😊",
+                "温馨": "看完很温暖，谢谢分享~ 🌟",
+                "批评": "我认为这个观点还有待商榷。"
+            }
         
         reply = mock_replies.get(reply_style, "很有意思的分享！")
         
@@ -259,22 +402,27 @@ async def generate_reply_endpoint(request: ReplyRequest):
     # 获取历史回复
     history_replies = get_reply_history(request.user_id, request.post_id)
     
-    # 生成回复
+    # 进行情感分析
+    emotion_analysis_result = analyze_emotion(request.circle_content)
+    
+    # 生成回复，传入情感分析结果
     reply_content = generate_reply(
         circle_content=request.circle_content,
         reply_style=request.reply_style,
         is_first_reply=first_reply,
-        previous_replies=history_replies
+        previous_replies=history_replies,
+        emotion_analysis=emotion_analysis_result
     )
     
     # 保存新回复
     save_reply_history(request.user_id, request.post_id, reply_content)
     
-    # 返回结果
+    # 返回结果，包含情感分析信息
     return ReplyResponse(
         reply_content=reply_content,
         is_first_reply=first_reply,
-        timestamp=datetime.now()
+        timestamp=datetime.now(),
+        emotion_analysis=emotion_analysis_result
     )
 
 # API端点：获取回复历史
