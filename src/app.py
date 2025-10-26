@@ -56,8 +56,87 @@ class ReplyResponse(BaseModel):
     timestamp: datetime = Field(..., description="生成时间戳")
     emotion_analysis: EmotionAnalysisResult = Field(..., description="情感分析结果")
 
+class AdDetectionRequest(BaseModel):
+    circle_content: str = Field(..., description="朋友圈内容")
+    user_id: str = Field(..., description="用户唯一标识")
+    post_id: str = Field(..., description="朋友圈帖子唯一标识")
+
+class AdDetectionResponse(BaseModel):
+    is_ad: bool = Field(..., description="是否为广告")
+    response_text: str = Field(..., description="响应文本")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="检测置信度")
+    timestamp: datetime = Field(..., description="检测时间戳")
+
 # 验证回复风格
 valid_styles = ["幽默", "严肃", "暧昧", "温馨", "批评"]
+
+# 广告检测关键词列表
+ad_keywords = [
+    "优惠", "折扣", "促销", "特价", "限时", "秒杀", "抢购",
+    "免费领取", "转发抽奖", "添加微信", "扫码关注", "加群",
+    "投资", "理财", "赚钱", "兼职", "副业", "日入", "月入",
+    "代理", "加盟", "招商", "合伙人", "会员", "VIP", "套餐",
+    "咨询电话", "联系方式", "微信", "QQ", "电话", "手机号",
+    "网址", "链接", "网址是", "链接是", "点击查看", "点击链接",
+    "扫码", "二维码", "长按识别", "识别二维码",
+    "正品", "保证", "效果", "神奇", "有效", "彻底", "解决"
+]
+
+# 广告检测函数
+def detect_ad(text: str) -> Dict:
+    """
+    检测文本是否为广告内容
+    返回包含是否为广告、置信度等信息的字典
+    """
+    try:
+        # 转换为小写进行检测
+        text_lower = text.lower()
+        
+        # 关键词匹配
+        matched_keywords = []
+        for keyword in ad_keywords:
+            if keyword in text_lower:
+                matched_keywords.append(keyword)
+        
+        # 计算置信度（简单实现：根据匹配到的关键词数量和文本长度计算）
+        confidence = 0.0
+        if text_lower.strip():
+            # 基础置信度：匹配关键词数 / 总关键词数
+            base_confidence = len(matched_keywords) / len(ad_keywords)
+            # 加权：根据关键词在文本中的密度调整
+            keyword_density = len(matched_keywords) / max(1, len(text_lower) / 10)  # 每10个字符的关键词数
+            confidence = min(1.0, base_confidence * 0.6 + keyword_density * 0.4)
+        
+        # 判断是否为广告（置信度大于0.3或匹配到2个以上关键词）
+        is_ad = confidence > 0.3 or len(matched_keywords) >= 2
+        
+        # 实际项目中可以使用更复杂的算法或调用专业的广告检测API
+        # 例如：
+        # response = openai.chat.completions.create(
+        #     model="gpt-3.5-turbo",
+        #     messages=[
+        #         {"role": "system", "content": "你是一个广告内容检测器，专门判断文本是否为广告。"},
+        #         {"role": "user", "content": f"请判断以下文本是否为广告，返回JSON格式：{{\"is_ad\": true/false, \"confidence\": 0.0-1.0, \"reason\": \"检测理由\"}}\n\n文本：{text}"}
+        #     ],
+        #     max_tokens=150,
+        #     temperature=0.3
+        # )
+        # result = json.loads(response.choices[0].message.content.strip())
+        
+        return {
+            "is_ad": is_ad,
+            "confidence": confidence,
+            "matched_keywords": matched_keywords,
+            "reason": f"匹配到{len(matched_keywords)}个广告关键词: {', '.join(matched_keywords)}"
+        }
+    except Exception as e:
+        # 出错时默认返回非广告
+        return {
+            "is_ad": False,
+            "confidence": 0.0,
+            "matched_keywords": [],
+            "reason": f"广告检测出错: {str(e)}"
+        }
 
 # 情感分析函数
 def analyze_emotion(text: str):
@@ -457,6 +536,26 @@ async def health_check():
         "redis_status": redis_status,
         "timestamp": datetime.now().isoformat()
     }
+
+# API端点：检测广告
+@app.post("/detect_ad", response_model=AdDetectionResponse)
+async def detect_ad_endpoint(request: AdDetectionRequest):
+    # 验证朋友圈内容
+    if not request.circle_content or len(request.circle_content.strip()) == 0:
+        raise HTTPException(status_code=400, detail="朋友圈内容不能为空")
+    
+    # 执行广告检测
+    detection_result = detect_ad(request.circle_content)
+    
+    # 构建响应
+    response_text = "我不感兴趣" if detection_result["is_ad"] else "非广告内容"
+    
+    return AdDetectionResponse(
+        is_ad=detection_result["is_ad"],
+        response_text=response_text,
+        confidence=detection_result["confidence"],
+        timestamp=datetime.now()
+    )
 
 if __name__ == "__main__":
     import uvicorn
