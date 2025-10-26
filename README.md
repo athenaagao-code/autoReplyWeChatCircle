@@ -1,123 +1,123 @@
-# 微信朋友圈自动回复服务
+# WeChatCircle Auto-Reply Service
 
-## 项目简介
+## Project Introduction
 
-这是一个基于FastAPI开发的微信朋友圈自动回复后端服务，可以根据用户提供的朋友圈内容和指定的回复风格，自动生成符合要求的回复内容。
+This is a WeChatCircle auto-reply backend service developed based on FastAPI. It can automatically generate reply content according to the user-provided WeChatCircle content and specified reply style.
 
-## 功能特性
+## Features
 
-- 根据朋友圈内容和回复风格生成自动回复
-- 支持多种回复风格：幽默、严肃、暧昧、温馨、批评
-- 智能判断是否为首次回复，首次回复和非首次回复采用不同的生成策略
-- 保存回复历史，支持上下文理解
-- 当回复数量超过20条时，自动生成摘要以适应上下文窗口限制
-- 支持Redis和内存两种存储方式
-- 回复内容限制在50字以内，可包含文字和微信表情包
+- Generate automatic replies based on WeChatCircle content and reply style
+- Support multiple reply styles: humorous, serious, ambiguous, warm, critical
+- Intelligently determine whether it's the first reply, using different generation strategies for first and non-first replies
+- Save reply history and support context understanding
+- Automatically generate summaries when the number of replies exceeds 20 to adapt to context window limitations
+- Support both Redis and memory storage methods
+- Limit reply content to 50 characters, which can include text and WeChat emojis
 
-## 技术栈
+## Technology Stack
 
 - Python 3.8+
 - FastAPI
-- Redis (可选)
-- OpenAI API (用于生成回复内容)
+- Redis (optional)
+- OpenAI API (for generating reply content)
 
-## 安装部署
+## Installation and Deployment
 
-### 1. 克隆项目
+### 1. Clone the Project
 
 ```bash
-git clone <项目仓库地址>
-cd <项目目录>
+git clone <project repository URL>
+cd <project directory>
 ```
 
-### 2. 安装依赖
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 配置环境变量
+### 3. Configure Environment Variables
 
-复制`.env`文件并根据实际情况修改配置：
+Copy the `.env` file and modify the configuration according to your actual situation:
 
 ```bash
 cp .env.example .env
-# 编辑.env文件，填入必要的配置信息
+# Edit the .env file and fill in the necessary configuration information
 ```
 
-### 4. 启动服务
+### 4. Start the Service
 
 ```bash
-# 开发模式启动
-python app.py
+# Start in development mode
+python src/app.py
 
-# 或使用uvicorn启动
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+# Or start with uvicorn
+uvicorn src.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-服务启动后，可以通过以下地址访问API文档：
+After the service starts, you can access the API documentation through the following address:
 http://localhost:8000/docs
 
-## API接口
+## API Interfaces
 
-### 1. 生成回复
+### 1. Generate Reply
 
 **URL**: `/generate_reply`
-**方法**: `POST`
-**请求体**:
+**Method**: `POST`
+**Request Body**:
 
 ```json
 {
-  "circle_content": "今天天气真好！",
-  "reply_style": "幽默",
+  "circle_content": "The weather is nice today!",
+  "reply_style": "humorous",
   "user_id": "user123",
   "post_id": "post456",
   "previous_replies": []
 }
 ```
 
-**响应**:
+**Response**:
 
 ```json
 {
-  "reply_content": "哈哈，确实不错，适合出门浪~ 😄",
+  "reply_content": "Haha, it's really nice, perfect for going out and having fun~ 😄",
   "is_first_reply": true,
   "timestamp": "2024-01-01T12:00:00"
 }
 ```
 
-### 2. 获取回复历史
+### 2. Get Reply History
 
 **URL**: `/reply_history/{user_id}/{post_id}`
-**方法**: `GET`
-**响应**:
+**Method**: `GET`
+**Response**:
 
 ```json
 {
   "user_id": "user123",
   "post_id": "post456",
   "reply_count": 3,
-  "replies": ["回复1", "回复2", "回复3"]
+  "replies": ["Reply 1", "Reply 2", "Reply 3"]
 }
 ```
 
-### 3. 删除回复历史
+### 3. Delete Reply History
 
 **URL**: `/reply_history/{user_id}/{post_id}`
-**方法**: `DELETE`
-**响应**:
+**Method**: `DELETE`
+**Response**:
 
 ```json
 {
-  "message": "回复历史已删除"
+  "message": "Reply history deleted"
 }
 ```
 
-### 4. 健康检查
+### 4. Health Check
 
 **URL**: `/health`
-**方法**: `GET`
-**响应**:
+**Method**: `GET`
+**Response**:
 
 ```json
 {
@@ -127,13 +127,13 @@ http://localhost:8000/docs
 }
 ```
 
-## 注意事项
+## Notes
 
-1. 本服务需要OpenAI API密钥才能正常生成回复内容，请确保在`.env`文件中正确配置
-2. Redis是可选的，如果不配置Redis，服务将自动使用内存存储
-3. 服务会自动处理上下文长度限制，当回复数量超过20条时生成摘要
-4. 生成的回复内容会进行长度限制和合规性检查
+1. This service requires an OpenAI API key to generate reply content normally. Please ensure it is correctly configured in the `.env` file.
+2. Redis is optional. If Redis is not configured, the service will automatically use memory storage.
+3. The service will automatically handle context length limitations and generate summaries when the number of replies exceeds 20.
+4. Generated reply content will undergo length limitation and compliance checks.
 
-## 许可证
+## License
 
 MIT License
